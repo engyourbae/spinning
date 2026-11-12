@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{d}/documents {
+    function admin() { return request.auth != null && request.auth.token.email == 'GANTI@EMAILADMIN.COM'; }
+
+    match /config/main {
+      allow read: if true;
+      allow write: if admin();
+    }
+    match /participants/{id} {
+      allow read, update, delete: if admin();
+      allow create: if get(/databases/$(d)/documents/config/main).data.get('open', true) == true
+        && request.resource.data.keys().hasOnly(['name','nim','ig','at','won'])
+        && request.resource.data.won == false
+        && request.resource.data.name is string && request.resource.data.name.size() <= 60
+        && request.resource.data.ig is string && request.resource.data.ig.size() <= 30
+        && id == request.resource.data.nim;
+    }
+    match /keys/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['nim']);
+      allow read, update, delete: if admin();
+    }
+  }
+}
