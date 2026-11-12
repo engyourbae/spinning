@@ -123,8 +123,9 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const I=n=>`<svg class="ic"><use href="#i-${n}"/></svg>`;
 const COL=['var(--red)','var(--yel)','var(--blu)','var(--grn)'];
 const rnd=n=>{const m=Math.floor(2**32/n)*n;let x;do{x=crypto.getRandomValues(new Uint32Array(1))[0]}while(x>=m);return x%n};
-const ready=FB.apiKey!=="ISI";let db,auth;
-if(ready){firebase.initializeApp(FB);db=firebase.firestore();auth=firebase.auth()}
+/* LOCAL = tanpa server: dipakai kalau config belum diisi atau Firebase gagal dimuat (offline) */
+const LOCAL=typeof firebase==='undefined'||FB.apiKey==="ISI";let db,auth;
+if(!LOCAL){firebase.initializeApp(FB);db=firebase.firestore();auth=firebase.auth()}
 let cfg={open:true,limit:3},parts=[],user=null,tab='spin',filt='all',q='',pending=null,busy=false,unsub=null;
 const SV=()=>firebase.firestore.FieldValue;
 const mark=`<svg viewBox="0 0 36 36"><rect x="3" y="9" width="24" height="18" rx="4" fill="#FFCB45" stroke="#17171C" stroke-width="2.5" transform="rotate(-10 15 18)"/><rect x="9" y="8" width="24" height="18" rx="4" fill="#FF5B3A" stroke="#17171C" stroke-width="2.5"/><rect x="14" y="19" width="9" height="3" rx="1.5" fill="#17171C"/></svg>`;
@@ -134,9 +135,17 @@ function ask(t,b,ok='Ya',danger){return new Promise(r=>{const m=document.createE
 const shareLink=()=>location.origin+location.pathname;
 function copy(t){navigator.clipboard.writeText(t).then(()=>toast('Tersalin'),()=>toast('Gagal menyalin'))}
 
+/* ---------- MODE LOKAL (tanpa server) ---------- */
+const LS={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){toast('Penyimpanan penuh / diblokir')}}};
+const nameKey=n=>'n_'+n.toLowerCase().replace(/[^a-z0-9]/g,'');
+function localLoad(){parts=LS.get('kk_parts',[]).sort((a,b)=>(a.at||0)-(b.at||0));cfg={open:true,limit:3,...LS.get('kk_cfg',{})}}
+const localSave=()=>LS.set('kk_parts',parts);
+function newReg(){localStorage.removeItem('kk_reg');reg()}
+function logout(){LOCAL?(location.hash=''):auth.signOut()}
+
 /* ---------- PESERTA ---------- */
 function reg(){
- const me=JSON.parse(localStorage.getItem('kk_reg')||'null');
+ const me=LS.get('kk_reg',null);
  let body;
  if(me)body=`<div class="ok"><div class="seal">${I('ok')}</div><h1 style="margin-top:14px">Kamu masuk!</h1><p class="sub" style="margin:0">Simpan kartu ini. Pantau Instagram untuk pengumuman pemenang.</p><div class="tk"><small style="font-weight:800;letter-spacing:1px">KARTU PESERTA</small><h2>${esc(me.name)}</h2><p>NIM ${esc(me.nim)}</p><p>@${esc(me.ig)}</p></div></div>`;
  else if(cfg.open===false)body=`<h1>Pendaftaran ditutup</h1><p class="sub">Kuota sudah penuh atau panitia menutup pendaftaran.</p>`;
@@ -146,7 +155,8 @@ function reg(){
  <div class="fld"><label>NIM</label><input class="inp" name="nim" inputmode="numeric" maxlength="20" required></div>
  <div class="fld"><label>Instagram</label><div class="pre"><span>@</span><input class="inp" name="ig" maxlength="30" autocapitalize="none" required></div></div>
  <button class="btn red big" style="margin-top:6px">Daftar sekarang</button></form>`;
- app.innerHTML=`<main class="wrap reg">${brand()}${body}</main>`;
+ const lo=LOCAL?`<p style="margin-top:24px;text-align:center;font-size:13px;color:var(--mut);font-weight:600">Mode lokal · data tersimpan di perangkat ini<br><a href="#admin" style="color:var(--ink)">Buka panel panitia</a>${me?` · <a href="#" onclick="newReg();return false" style="color:var(--ink)">Daftarkan orang lain</a>`:''}</p>`:'';
+ app.innerHTML=`<main class="wrap reg">${brand()}${body}${lo}</main>`;
 }
 async function submitReg(e){
  e.preventDefault();const f=e.target;
@@ -154,7 +164,14 @@ async function submitReg(e){
  if(name.length<2)return toast('Nama terlalu pendek');
  if(!/^\d{5,20}$/.test(nim))return toast('NIM harus angka (5–20 digit)');
  if(!/^[a-z0-9._]{1,30}$/.test(ig))return toast('Username Instagram tidak valid');
- const nk='n_'+name.toLowerCase().replace(/[^a-z0-9]/g,'');
+ const nk=nameKey(name);
+ if(LOCAL){
+  localLoad();
+  if(cfg.open===false)return toast('Pendaftaran ditutup');
+  if(parts.some(p=>p.nim===nim||nameKey(p.name)===nk))return toast('Nama / NIM sudah terdaftar');
+  parts.push({name,nim,ig,at:Date.now(),won:false});localSave();
+  LS.set('kk_reg',{name,nim,ig});return reg();
+ }
  const b=db.batch();
  b.set(db.doc('participants/'+nim),{name,nim,ig,at:SV().serverTimestamp(),won:false});
  b.set(db.doc('keys/'+nk),{nim});
@@ -173,7 +190,7 @@ function doLogin(e){e.preventDefault();auth.signInWithEmailAndPassword(e.target.
 function admin(){
  if(!user)return login();
  const T=[['spin','shuf','Kocok'],['list','users','Peserta'],['win','cup','Pemenang'],['set','set','Atur']];
- app.innerHTML=`<header class="top"><div>${brand()}<button class="ib" onclick="auth.signOut()" aria-label="Keluar">${I('out')}</button></div></header><main class="wrap" id="v"></main>
+ app.innerHTML=`<header class="top"><div>${brand()}<button class="ib" onclick="logout()" aria-label="Keluar">${I('out')}</button></div></header>${LOCAL?`<div style="background:var(--yel);border-bottom:var(--ln);text-align:center;font-size:12px;font-weight:800;padding:6px 10px">MODE LOKAL · data hanya ada di perangkat ini</div>`:''}<main class="wrap" id="v"></main>
  <nav class="nav"><div>${T.map(t=>`<button data-t="${t[0]}" onclick="go('${t[0]}')">${I(t[1])}${t[2]}</button>`).join('')}</div></nav>`;
  draw();
 }
@@ -219,6 +236,7 @@ function confetti(st){
 function cancelPick(){pending=null;draw()}
 async function keep(){
  const w=pending;if(!w)return;
+ if(LOCAL){const p=parts.find(x=>x.nim===w.nim);if(p){p.won=true;p.rank=winners().length+1;p.wonAt=Date.now();localSave()}pending=null;toast(w.name+' masuk daftar pemenang');return draw()}
  try{await db.doc('participants/'+w.nim).update({won:true,rank:winners().length+1,wonAt:SV().serverTimestamp()});pending=null;toast(w.name+' masuk daftar pemenang');draw()}
  catch(e){toast('Gagal menyimpan')}
 }
@@ -234,7 +252,8 @@ function rows(){
 async function del(nim){
  const p=parts.find(x=>x.nim===nim);
  if(!await ask('Hapus peserta?',`${esc(p.name)} akan dihapus dari daftar.`,'Hapus',1))return;
- const nk='n_'+p.name.toLowerCase().replace(/[^a-z0-9]/g,'');
+ if(LOCAL){parts=parts.filter(x=>x.nim!==nim);localSave();return draw()}
+ const nk=nameKey(p.name);
  const b=db.batch();b.delete(db.doc('participants/'+nim));b.delete(db.doc('keys/'+nk));b.commit().catch(()=>toast('Gagal menghapus'));
 }
 function vWin(){
@@ -252,9 +271,12 @@ function vSet(){
  <div class="set" style="display:block"><b>Link pendaftaran</b><div class="tool" style="margin:10px 0 0"><div class="pre"><span>${I('ln')}</span><input class="inp" readonly value="${esc(shareLink())}"></div><button class="ib" style="height:50px;width:50px" onclick="copy(shareLink())" aria-label="Salin">${I('cp')}</button></div></div>
  <div class="set"><div><b>Reset pemenang</b><small>Semua peserta bisa menang lagi</small></div><button class="btn sm red" onclick="resetW()">Reset</button></div></div>`;
 }
-function setCfg(o){db.doc('config/main').set(o,{merge:true}).catch(()=>toast('Gagal menyimpan'))}
+function setCfg(o){
+ if(LOCAL){cfg={...cfg,...o};LS.set('kk_cfg',cfg);return draw()}
+ db.doc('config/main').set(o,{merge:true}).catch(()=>toast('Gagal menyimpan'))}
 async function resetW(){
  if(!await ask('Reset pemenang?','Status menang semua peserta akan dihapus.','Reset',1))return;
+ if(LOCAL){parts.forEach(p=>{p.won=false;delete p.rank;delete p.wonAt});localSave();toast('Pemenang direset');return draw()}
  const b=db.batch();winners().forEach(p=>b.update(db.doc('participants/'+p.nim),{won:false,rank:SV().delete(),wonAt:SV().delete()}));
  b.commit().then(()=>toast('Pemenang direset'),()=>toast('Gagal'));
 }
@@ -273,8 +295,13 @@ function listen(){
  if(unsub)unsub();
  unsub=db.collection('participants').orderBy('at').onSnapshot(s=>{parts=s.docs.map(d=>d.data());if(isAdmin()&&user)draw()},()=>toast('Tidak punya akses data'));
 }
-if(!ready){
- app.innerHTML=`<main class="wrap reg">${brand()}<h1>Satu langkah lagi.</h1><p class="sub">Isi konfigurasi Firebase di bagian atas script pada index.html, lalu muat ulang.</p></main>`;
+if(LOCAL){
+ user={local:true};localLoad();
+ const go2=()=>{localLoad();route()};
+ addEventListener('hashchange',go2);
+ addEventListener('storage',()=>{const o=cfg.open;localLoad();if(isAdmin())draw();else if(o!==cfg.open)reg()});
+ route();
+ if(typeof firebase==='undefined'&&FB.apiKey!=="ISI")toast('Firebase tidak terjangkau, memakai mode lokal');
 }else{
  let first=true;
  db.doc('config/main').onSnapshot(s=>{const o=cfg.open;cfg={open:true,limit:3,...(s.data()||{})};
