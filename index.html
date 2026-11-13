@@ -162,6 +162,7 @@ a.btn{text-decoration:none;color:var(--ink)}
 <symbol id="i-ln" viewBox="0 0 24 24"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3A4 4 0 0011 18.7l1-1"/></symbol>
 <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
 <symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 5.1A10 10 0 0112 5c6.4 0 10 7 10 7a17 17 0 01-3.2 4M6.5 6.6A16.6 16.6 0 002 12s3.6 7 10 7a10 10 0 004.4-1M9.9 9.9a3 3 0 004.2 4.2"/></symbol>
+<symbol id="i-ig" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.6"/><path d="M16.8 7.2h.01"/></symbol>
 <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
 </defs></svg>
 <div id="app"></div>
@@ -180,7 +181,7 @@ const rnd=n=>{const m=Math.floor(2**32/n)*n;let x;do{x=crypto.getRandomValues(ne
 /* LOCAL = tanpa server: dipakai kalau config belum diisi atau Firebase gagal dimuat (offline) */
 const LOCAL=typeof firebase==='undefined'||FB.apiKey==="ISI";let db,auth;
 if(!LOCAL){firebase.initializeApp(FB);db=firebase.firestore();auth=firebase.auth()}
-const DEF={open:true,limit:3,title:'Ikut kocokan Spinning',batch:'',verify:'Nama peserta akan diverifikasi dulu dengan data dari form kuesioner yang sudah kamu isi. Pastikan kamu sudah menjawab form sebelum mendaftar.',rules:'Isi form kuesioner terlebih dahulu.\nGunakan nama lengkap dan NIM yang sama dengan yang kamu isi di form.\nSatu NIM dan satu nama hanya bisa mendaftar satu kali.\nPantau Instagram untuk pengumuman pemenang.',formUrl:''};
+const DEF={open:true,limit:3,title:'Ikut kocokan Spinning',batch:'',verify:'Nama peserta akan diverifikasi dulu dengan data dari form kuesioner yang sudah kamu isi. Pastikan kamu sudah menjawab form sebelum mendaftar.',rules:'Isi form kuesioner terlebih dahulu.\nGunakan nama lengkap dan NIM yang sama dengan yang kamu isi di form.\nSatu NIM dan satu nama hanya bisa mendaftar satu kali.\nPantau Instagram untuk pengumuman pemenang.',formUrl:'',igAdmin:''};
 let cfg={...DEF,...(()=>{try{return JSON.parse(localStorage.getItem('kk_cfgc'))||{}}catch(e){return{}}})()},parts=[],user=null,tab='spin',filt='all',q='',pending=null,busy=false,unsub=null;
 const SV=()=>firebase.firestore.FieldValue;
 const mark=`<svg viewBox="0 0 36 36"><rect x="3" y="9" width="24" height="18" rx="4" fill="#FFCB45" stroke="#17171C" stroke-width="2.5" transform="rotate(-10 15 18)"/><rect x="9" y="8" width="24" height="18" rx="4" fill="#FF5B3A" stroke="#17171C" stroke-width="2.5"/><rect x="14" y="19" width="9" height="3" rx="1.5" fill="#17171C"/></svg>`;
@@ -204,6 +205,7 @@ function logout(){LOCAL?(location.hash=''):auth.signOut()}
 const pg=()=>location.hash.slice(1);
 function reg(){const p=pg();p==='daftar'?regForm():p==='kartu'?regCard():home()}
 const nl=t=>esc(t).replace(/\n/g,'<br>');
+const igBtn=u=>{u=(u||'').trim();return u?`<a class="btn" style="height:52px;width:100%;margin-top:12px" href="https://instagram.com/${esc(u)}" target="_blank" rel="noopener">${I('ig')}Instagram @${esc(u)}</a>`:''};
 /* Halaman awal: aturan + tombol masuk + admin kecil di bawah */
 function home(){
  const me=LS.get('kk_reg',null),closed=cfg.open===false;
@@ -217,7 +219,7 @@ function home(){
  app.innerHTML=`<main class="wrap reg">${brand()}${batch?`<span class="chip">${esc(batch)}</span>`:''}<h1>${esc(cfg.title||DEF.title)}</h1>
  ${cfg.verify&&cfg.verify.trim()?`<div class="verify">${nl(cfg.verify.trim())}</div>`:''}
  ${rules.length?`<div class="card"><h4 style="margin-bottom:14px">Aturan</h4><ol class="rules">${rules.map(r=>`<li><span>${esc(r)}</span></li>`).join('')}</ol></div>`:''}
- <div class="stack">${form}${main}</div>
+ <div class="stack">${form}${main}${igBtn(cfg.igAdmin).replace(' margin-top:12px','')}</div>
  <p class="foot"><a href="#admin">Admin</a>${lo}</p></main>`;
 }
 function regForm(){
@@ -236,7 +238,7 @@ function regForm(){
 function regCard(){
  const me=LS.get('kk_reg',null);
  if(!me){location.hash='';return}
- app.innerHTML=`<main class="wrap reg">${brand()}<div class="ok"><div class="seal">${I('ok')}</div><h1 style="margin-top:14px">Kamu masuk!</h1><p class="sub" style="margin:0">Simpan kartu ini. Pantau Instagram untuk pengumuman pemenang.</p><div class="tk"><small style="font-weight:800;letter-spacing:1px">KARTU PESERTA</small><h2>${esc(me.name)}</h2><p>NIM ${esc(me.nim)}</p><p>@${esc(me.ig)}</p></div></div>
+ app.innerHTML=`<main class="wrap reg">${brand()}<div class="ok"><div class="seal">${I('ok')}</div><h1 style="margin-top:14px">Kamu masuk!</h1><p class="sub" style="margin:0">Simpan kartu ini. Pantau Instagram untuk pengumuman pemenang.</p><div class="tk"><small style="font-weight:800;letter-spacing:1px">KARTU PESERTA</small><h2>${esc(me.name)}</h2><p>NIM ${esc(me.nim)}</p><p>@${esc(me.ig)}</p></div></div>${igBtn(cfg.igAdmin)}
  <p class="foot"><a href="#">Kembali ke awal</a><br><a href="#" onclick="newReg();return false">Bukan kamu? Daftar ulang</a></p></main>`;
 }
 async function submitReg(e){
@@ -253,11 +255,12 @@ async function submitReg(e){
   parts.push({name,nim,ig,at:Date.now(),won:false});localSave();
   LS.set('kk_reg',{name,nim,ig});location.hash='kartu';return;
  }
+ if(cfg.open===false)return toast('Pendaftaran sedang ditutup');
  const b=db.batch();
  b.set(db.doc('participants/'+nim),{name,nim,ig,at:SV().serverTimestamp(),won:false});
  b.set(db.doc('keys/'+nk),{nim});
  try{await b.commit();localStorage.setItem('kk_reg',JSON.stringify({name,nim,ig}));location.hash='kartu'}
- catch(x){toast(x.code==='permission-denied'?'Nama / NIM sudah terdaftar atau pendaftaran ditutup':'Gagal, coba lagi')}
+ catch(x){toast(x.code==='permission-denied'?'Nama atau NIM ini sudah terdaftar. Kalau merasa salah, hubungi panitia.':'Gagal, coba lagi')}
 }
 
 /* ---------- ADMIN ---------- */
@@ -425,11 +428,28 @@ function rows(){
  return L.map((p,i)=>`<div class="li"><div class="av" style="background:${COL[i%4]}">${esc(p.name[0].toUpperCase())}</div><div class="t"><b>${esc(p.name)}</b><small>${esc(p.nim)} · @${esc(p.ig)}</small></div>${p.won?'<span class="bd">Menang</span>':''}<button class="ib" onclick="del('${p.nim}')" aria-label="Hapus">${I('tr')}</button></div>`).join('');
 }
 async function del(nim){
- const p=parts.find(x=>x.nim===nim);
- if(!await ask('Hapus peserta?',`${esc(p.name)} akan dihapus dari daftar.`,'Hapus',1))return;
+ const p=parts.find(x=>x.nim===nim);if(!p)return;
+ if(!await ask('Hapus peserta?',`${esc(p.name)} akan dihapus dari daftar dan dari Firestore.`,'Hapus',1))return;
  if(LOCAL){parts=parts.filter(x=>x.nim!==nim);localSave();return draw()}
- const nk=nameKey(p.name);
- const b=db.batch();b.delete(db.doc('participants/'+nim));b.delete(db.doc('keys/'+nk));b.commit().catch(()=>toast('Gagal menghapus'));
+ try{
+  /* hapus data peserta + SEMUA kunci nama miliknya (dicari lewat NIM, jadi tidak ada yang nyangkut) */
+  const ks=new Set([nameKey(p.name)]);
+  (await db.collection('keys').where('nim','==',nim).get()).forEach(d=>ks.add(d.id));
+  const b=db.batch();b.delete(db.doc('participants/'+nim));ks.forEach(k=>b.delete(db.doc('keys/'+k)));
+  await b.commit();toast('Peserta dihapus');
+ }catch(e){toast('Gagal menghapus ('+(e.code||'error')+')')}
+}
+/* bersihkan nama yang masih tersimpan padahal pesertanya sudah tidak ada */
+async function cleanKeys(){
+ if(LOCAL)return toast('Tidak perlu di mode lokal');
+ if(!await ask('Bersihkan sisa nama?','Nama yang masih tersimpan di Firestore padahal pesertanya sudah dihapus akan dibersihkan.','Bersihkan'))return;
+ try{
+  const have=new Set(parts.map(x=>x.nim)),snap=await db.collection('keys').get();
+  const old=snap.docs.filter(d=>!have.has(d.data().nim));
+  if(!old.length)return toast('Tidak ada sisa nama');
+  for(let i=0;i<old.length;i+=400){const b=db.batch();old.slice(i,i+400).forEach(d=>b.delete(d.ref));await b.commit()}
+  toast(old.length+' sisa nama dibersihkan');
+ }catch(e){toast('Gagal membersihkan ('+(e.code||'error')+')')}
 }
 function vWin(){
  const W=winners();
@@ -444,26 +464,30 @@ function vSet(){
  return `<div class="card"><div class="set"><div><b>Pendaftaran</b><small>${cfg.open!==false?'Terbuka untuk umum':'Ditutup'}</small></div><button class="sw ${cfg.open!==false?'on':''}" onclick="setCfg({open:cfg.open===false})" aria-label="Toggle"></button></div>
  <div class="set"><div><b>Jumlah pemenang</b><small>Batas maksimal kocokan</small></div><div class="stp"><button class="ib" onclick="setCfg({limit:Math.max(1,cfg.limit-1)})">${I('mn')}</button><b>${cfg.limit}</b><button class="ib" onclick="setCfg({limit:cfg.limit+1})">${I('pl')}</button></div></div>
  <div class="set" style="display:block"><b>Link pendaftaran</b><div class="tool" style="margin:10px 0 0"><div class="pre"><span>${I('ln')}</span><input class="inp" readonly value="${esc(shareLink())}"></div><button class="ib" style="height:50px;width:50px" onclick="copy(shareLink())" aria-label="Salin">${I('cp')}</button></div></div>
- <div class="set"><div><b>Reset pemenang</b><small>Semua peserta bisa menang lagi</small></div><button class="btn sm red" onclick="resetW()">Reset</button></div></div>`+vHome();
+ <div class="set"><div><b>Reset pemenang</b><small>Semua peserta bisa menang lagi</small></div><button class="btn sm red" onclick="resetW()">Reset</button></div>
+ ${LOCAL?'':`<div class="set"><div><b>Bersihkan sisa nama</b><small>Hapus nama yang nyangkut di Firestore</small></div><button class="btn sm yel" onclick="cleanKeys()">Bersihkan</button></div>`}</div>`+vHome();
 }
 let draft=null;
 function vHome(){
- const d=draft||{title:cfg.title,batch:cfg.batch,verify:cfg.verify,rules:cfg.rules,formUrl:cfg.formUrl};
+ const d=draft||{ig:cfg.igAdmin,title:cfg.title,batch:cfg.batch,verify:cfg.verify,rules:cfg.rules,formUrl:cfg.formUrl};
  return `<form class="card" id="home" style="margin-top:16px" onsubmit="saveHome(event)" autocomplete="off">
  <h4 style="margin-bottom:14px">Halaman awal</h4>
  <div class="fld"><label>Judul</label><input class="inp" name="hTitle" maxlength="60" value="${esc(d.title||'')}"></div>
  <div class="fld"><label>Keterangan angkatan</label><input class="inp" name="hBatch" maxlength="40" placeholder="Contoh: Angkatan 23-24" value="${esc(d.batch||'')}"><small class="hint">Tampil sebagai label di atas judul. Kosongkan kalau tidak perlu.</small></div>
  <div class="fld"><label>Teks verifikasi</label><textarea class="inp ta" name="hVerify" maxlength="400">${esc(d.verify||'')}</textarea></div>
  <div class="fld"><label>Aturan</label><textarea class="inp ta" name="hRules" maxlength="1200" style="min-height:150px">${esc(d.rules||'')}</textarea><small class="hint">Satu aturan per baris.</small></div>
+ <div class="fld"><label>Instagram admin</label><div class="pre"><span>@</span><input class="inp" name="hIg" maxlength="100" autocapitalize="none" placeholder="username" value="${esc(d.ig||'')}"></div><small class="hint">Tampil sebagai tombol Instagram di halaman awal dan kartu peserta.</small></div>
  <div class="fld"><label>Link form kuesioner</label><div class="pre"><span>${I('ln')}</span><input class="inp" name="hForm" inputmode="url" autocapitalize="none" placeholder="https://forms.gle/..." value="${esc(d.formUrl||'')}"></div><small class="hint">Kalau diisi, muncul tombol "Isi form kuesioner dulu" di halaman awal.</small></div>
  <div class="two"><a class="btn" href="${esc(shareLink())}" target="_blank" rel="noopener">Pratinjau</a><button class="btn blu">Simpan</button></div></form>`;
 }
-function grabDraft(){const f=$('#home');if(f)draft={title:f.hTitle.value,batch:f.hBatch.value,verify:f.hVerify.value,rules:f.hRules.value,formUrl:f.hForm.value}}
+function grabDraft(){const f=$('#home');if(f)draft={ig:f.hIg.value,title:f.hTitle.value,batch:f.hBatch.value,verify:f.hVerify.value,rules:f.hRules.value,formUrl:f.hForm.value}}
 async function saveHome(e){
  e.preventDefault();const f=e.target;
  let u=f.hForm.value.trim();if(u&&!/^https?:\/\//i.test(u))u='https://'+u;
  if(u){try{new URL(u)}catch(x){return toast('Link form tidak valid')}}
- const o={title:f.hTitle.value.trim()||DEF.title,batch:f.hBatch.value.trim(),verify:f.hVerify.value.trim(),rules:f.hRules.value.trim(),formUrl:u};
+ let ig=f.hIg.value.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i,'').replace(/^@/,'').replace(/[\/?].*$/,'').toLowerCase();
+ if(ig&&!/^[a-z0-9._]{1,30}$/.test(ig))return toast('Username Instagram tidak valid');
+ const o={igAdmin:ig,title:f.hTitle.value.trim()||DEF.title,batch:f.hBatch.value.trim(),verify:f.hVerify.value.trim(),rules:f.hRules.value.trim(),formUrl:u};
  if(await setCfg(o)){draft=null;toast('Halaman awal tersimpan');draw()}
 }
 function setCfg(o){
@@ -501,6 +525,7 @@ if(LOCAL){
  let first=true;
  db.doc('config/main').onSnapshot(s=>{const o=cfg.open;cfg={...DEF,...(s.data()||{})};
   try{localStorage.setItem('kk_cfgc',JSON.stringify(cfg))}catch(e){}
+  if(!s.exists&&user)db.doc('config/main').set({open:true,limit:3},{merge:true}).catch(()=>{});
   if(!first&&!isAdmin()){if(!pg()||o!==cfg.open)reg()}else if(isAdmin()&&user)draw()},()=>{});
  auth.onAuthStateChanged(u=>{user=u;if(u)listen();else if(unsub){unsub();unsub=null;parts=[]}first=false;route()});
  addEventListener('hashchange',route);
