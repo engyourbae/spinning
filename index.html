@@ -159,7 +159,9 @@ const LS={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==nul
 const nameKey=n=>'n_'+n.toLowerCase().replace(/[^a-z0-9]/g,'');
 function localLoad(){parts=LS.get('kk_parts',[]).sort((a,b)=>(a.at||0)-(b.at||0));cfg={...DEF,...LS.get('kk_cfg',{})}}
 const localSave=()=>LS.set('kk_parts',parts);
-function newReg(){localStorage.removeItem('kk_reg');location.hash='daftar'}
+async function newReg(){
+ if(!await ask('Daftar ulang?','Kartu di perangkat ini akan dihapus supaya kamu bisa daftar lagi. Data di server tidak ikut terhapus.','Daftar ulang',1))return;
+ localStorage.removeItem('kk_reg');location.hash='daftar';if(pg()==='daftar')reg()}
 function logout(){LOCAL?(location.hash=''):auth.signOut()}
 
 /* ---------- PESERTA ---------- */
@@ -175,7 +177,7 @@ function home(){
   :closed?`<button class="btn big" disabled>Pendaftaran ditutup</button>`
   :`<a class="btn red big" href="#daftar">Masukkan nama peserta</a>`;
  const form=cfg.formUrl&&!me?`<a class="btn yel" style="height:52px;width:100%" href="${esc(cfg.formUrl)}" target="_blank" rel="noopener">${I('ln')}Isi form kuesioner dulu</a>`:'';
- const lo=LOCAL?`<br>Mode lokal · data tersimpan di perangkat ini${me?` · <a href="#" onclick="newReg();return false">Daftarkan orang lain</a>`:''}`:'';
+ const lo=(LOCAL?'<br>Mode lokal · data tersimpan di perangkat ini':'')+(me?(LOCAL?' · ':'<br>')+'<a href="#" onclick="newReg();return false">Bukan kamu? Daftar ulang</a>':'');
  app.innerHTML=`<main class="wrap reg">${brand()}${batch?`<span class="chip">${esc(batch)}</span>`:''}<h1>${esc(cfg.title||DEF.title)}</h1>
  ${cfg.verify&&cfg.verify.trim()?`<div class="verify">${nl(cfg.verify.trim())}</div>`:''}
  ${rules.length?`<div class="card"><h4 style="margin-bottom:14px">Aturan</h4><ol class="rules">${rules.map(r=>`<li><span>${esc(r)}</span></li>`).join('')}</ol></div>`:''}
@@ -199,7 +201,7 @@ function regCard(){
  const me=LS.get('kk_reg',null);
  if(!me){location.hash='';return}
  app.innerHTML=`<main class="wrap reg">${brand()}<div class="ok"><div class="seal">${I('ok')}</div><h1 style="margin-top:14px">Kamu masuk!</h1><p class="sub" style="margin:0">Simpan kartu ini. Pantau Instagram untuk pengumuman pemenang.</p><div class="tk"><small style="font-weight:800;letter-spacing:1px">KARTU PESERTA</small><h2>${esc(me.name)}</h2><p>NIM ${esc(me.nim)}</p><p>@${esc(me.ig)}</p></div></div>
- <p class="foot"><a href="#">Kembali ke awal</a>${LOCAL?` · <a href="#" onclick="newReg();return false">Daftarkan orang lain</a>`:''}</p></main>`;
+ <p class="foot"><a href="#">Kembali ke awal</a><br><a href="#" onclick="newReg();return false">Bukan kamu? Daftar ulang</a></p></main>`;
 }
 async function submitReg(e){
  e.preventDefault();const f=e.target;
